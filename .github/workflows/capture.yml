@@ -22,6 +22,11 @@ jobs:
           pip install -r requirements.txt
           playwright install --with-deps chromium
 
+      - name: Tulis auth.json dari secret
+        env:
+          STORAGE_STATE: ${{ secrets.PLAYWRIGHT_STORAGE_STATE }}
+        run: echo "$STORAGE_STATE" > auth.json
+
       - name: Jalankan capture dan kirim ke Telegram
         env:
           DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
