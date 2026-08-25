@@ -98,7 +98,7 @@ def main() -> None:
 
     try:
         capture_dashboard(DASHBOARD_URL, SCREENSHOT_PATH)
-        caption = f"Update Dashboard Provisioning Klojen\n{now_wib}"
+        caption = f"Update Dashboard Provisioning Turen\n{now_wib}"
         send_photo_to_telegram(SCREENSHOT_PATH, caption)
         print("Berhasil capture dan kirim ke Telegram.")
     except SessionExpiredError as exc:
