@@ -24,13 +24,23 @@ BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 SCREENSHOT_PATH = "dashboard_capture.png"
+AUTH_FILE = "auth.json"
+
+
+class SessionExpiredError(Exception):
+    """Dilempar kalau sesi login yang tersimpan di auth.json sudah tidak valid lagi."""
 
 
 def capture_dashboard(url: str, output_path: str) -> None:
-    """Buka dashboard dengan headless browser dan simpan full-page screenshot."""
+    """Buka dashboard dengan sesi login tersimpan (auth.json) dan simpan
+    full-page screenshot."""
     with sync_playwright() as p:
         browser = p.chromium.launch()
-        page = browser.new_page(viewport={"width": 1200, "height": 2000})
+        context = browser.new_context(
+            storage_state=AUTH_FILE,
+            viewport={"width": 1200, "height": 2000},
+        )
+        page = context.new_page()
 
         # Catatan: sengaja TIDAK pakai wait_until="networkidle" di sini.
         # Dashboard Looker Studio biasanya terus melakukan polling data di
@@ -41,6 +51,16 @@ def capture_dashboard(url: str, output_path: str) -> None:
         # tetap supaya chart sempat selesai render.
         page.goto(url, wait_until="load", timeout=90_000)
         page.wait_for_timeout(15_000)
+
+        # Kalau ternyata dilempar ke halaman login Google, berarti sesi di
+        # auth.json sudah tidak valid lagi (kedaluwarsa / diminta verifikasi
+        # ulang) - bukan masalah render dashboard.
+        if "accounts.google.com" in page.url:
+            browser.close()
+            raise SessionExpiredError(
+                "Sesi login (auth.json) sudah tidak valid — perlu di-generate ulang "
+                "lewat generate_auth_state.py."
+            )
 
         page.screenshot(path=output_path, full_page=True)
         browser.close()
@@ -81,6 +101,18 @@ def main() -> None:
         caption = f"Update Dashboard Provisioning Klojen\n{now_wib}"
         send_photo_to_telegram(SCREENSHOT_PATH, caption)
         print("Berhasil capture dan kirim ke Telegram.")
+    except SessionExpiredError as exc:
+        error_message = (
+            f"⚠️ Gagal capture ({now_wib}).\n{exc}\n"
+            "Tolong generate ulang auth.json secara lokal, lalu update isi "
+            "GitHub Secret PLAYWRIGHT_STORAGE_STATE."
+        )
+        print(error_message)
+        try:
+            send_text_to_telegram(error_message)
+        except Exception:
+            print("Gagal juga mengirim notifikasi error ke Telegram.")
+        sys.exit(1)
     except Exception as exc:
         error_message = f"Gagal capture dashboard ({now_wib}).\nDetail error: {exc}"
         print(error_message)
