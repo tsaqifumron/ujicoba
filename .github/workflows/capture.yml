@@ -1,1 +1,30 @@
+name: Capture Dashboard dan Kirim ke Telegram
 
+on:
+  schedule:
+    - cron: '0 3,10 * * *'   # 10:00 dan 17:00 WIB (WIB = UTC+7)
+  workflow_dispatch:          # supaya bisa dijalankan manual dari tab Actions
+
+jobs:
+  capture-and-send:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+
+      - name: Jalankan capture dan kirim ke Telegram
+        env:
+          DASHBOARD_URL: ${{ secrets.DASHBOARD_URL }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python capture_and_send.py
