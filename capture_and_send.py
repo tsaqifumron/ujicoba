@@ -32,11 +32,15 @@ def capture_dashboard(url: str, output_path: str) -> None:
         browser = p.chromium.launch()
         page = browser.new_page(viewport={"width": 1200, "height": 2000})
 
-        page.goto(url, wait_until="networkidle", timeout=60_000)
-
-        # Buffer tambahan karena Looker Studio kadang masih polling data
-        # walau network sudah dianggap "idle" oleh browser.
-        page.wait_for_timeout(5_000)
+        # Catatan: sengaja TIDAK pakai wait_until="networkidle" di sini.
+        # Dashboard Looker Studio biasanya terus melakukan polling data di
+        # latar belakang (live update, analytics beacon), sehingga koneksi
+        # network nyaris tidak pernah benar-benar "idle" dan goto() akan
+        # selalu timeout kalau menunggu kondisi itu. Sebagai gantinya,
+        # tunggu "load" (dokumen + resource utama selesai), lalu beri jeda
+        # tetap supaya chart sempat selesai render.
+        page.goto(url, wait_until="load", timeout=90_000)
+        page.wait_for_timeout(15_000)
 
         page.screenshot(path=output_path, full_page=True)
         browser.close()
